@@ -16,12 +16,12 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Factory;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.*;
+import com.intellij.openapi.vfs.ReadonlyStatusHandler;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.file.PsiBinaryFileImpl;
 import com.intellij.psi.impl.source.xml.XmlFileImpl;
@@ -40,19 +40,16 @@ import com.intellij.usages.impl.UsageViewImpl;
 import com.intellij.usages.rules.UsageInFile;
 import com.intellij.util.AdapterProcessor;
 import com.intellij.util.ThrowableRunnable;
-import com.intellij.util.io.IOUtil;
-import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.psi.KtElement;
 import org.jetbrains.kotlin.psi.KtObjectDeclaration;
 import org.jetbrains.kotlin.psi.KtPsiUtil;
-import other.mviSetup.ActivtyAndLayoutKt;
 
 import javax.swing.*;
-import java.io.*;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 
@@ -101,29 +98,7 @@ public class AddPrefixToBatchFile extends AnAction {
 
             @Override
             public void doRenameBinding(String prefix, String oldPrefix) {
-               // renameXmlBinding(prefix, oldPrefix);
-                try {
-                    String packageName="";
-                    String packageNamePath= packageName.replaceAll("\\.","/");
-
-                    String tmp=ActivtyAndLayoutKt.someActivity(packageName, "entityName",
-                            "layoutName", null);
-                    File f=new File(project.getBasePath(),"app/src/main/java/"+packageNamePath+"/App.kt");
-                    PlugUtil.showMsg(f.getAbsolutePath(),project);
-                    FileOutputStream ous = new FileOutputStream(f);
-                    IOUtils.write(tmp.getBytes(StandardCharsets.UTF_8),ous);
-                    ous.close();
-
-                    FileDocumentManager.getInstance().saveAllDocuments();
-
-                    VirtualFile vv =  VfsUtil.findFileByIoFile(f,true);
-
-                    FileDocumentManager.getInstance().reloadFromDisk( FileDocumentManager.getInstance().getDocument(vv));
-
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    PlugUtil.showMsg(getStack(ex),project);
-                }
+                renameXmlBinding(prefix, oldPrefix);
             }
 
             @Override
@@ -218,11 +193,11 @@ public class AddPrefixToBatchFile extends AnAction {
         }
         for (PsiElement e : children) {
             if (e instanceof PsiDirectory || isDir(e) ||
-                    isJavaClass(e) || isJavaFile(e) ||
-                    isKtClass(e) || isKtFile(e)||isKtObject(e)) {
+                    isJavaFile(e) || isKtFile(e)) {
                 findJavaKotlin(e, result, condition);
             } else {
                 if (condition.isMatch(e)) {
+                    PlugUtil.showMsg("element:" + e + "@" + e.getClass().getName(), project);
                     String name = getOldName(e);
                     if (name != null) {
                         result.put(name, e);
@@ -329,9 +304,6 @@ public class AddPrefixToBatchFile extends AnAction {
             return;
         }
         oldName = oldName.substring(xmlPrefix.length());
-        if (oldPrefix != null && oldPrefix.length() > 0) {
-            oldName = oldPrefix + oldName;
-        }
         String[] arr = oldName.split("_");
         if (arr == null || arr.length <= 0) {
             runnable.run();
@@ -344,6 +316,17 @@ public class AddPrefixToBatchFile extends AnAction {
         bindingName += "Binding";
         PlugUtil.showMsg("binding name:" + bindingName, project);
 
+        String oldBindingName = "";
+        if (oldPrefix != null && oldPrefix.length() > 0) {
+            String[] temp = oldPrefix.split("_");
+            if (temp.length > 0) {
+                for (String part : arr) {
+                    oldBindingName += upperFistChar(part);
+                }
+            }
+        }
+        oldBindingName += bindingName;
+
         String[] prefixarr = xmlPrefix.split("_");
         if (prefixarr == null || prefixarr.length <= 0) {
             runnable.run();
@@ -352,7 +335,7 @@ public class AddPrefixToBatchFile extends AnAction {
 
         String prefix = upperFistChar(prefixarr[0]);
 
-        if(bindingName.startsWith(prefix)){
+        if (oldBindingName.startsWith(prefix)) {
             runnable.run();
             return;
         }
@@ -360,7 +343,7 @@ public class AddPrefixToBatchFile extends AnAction {
         String newBindingName = prefix + bindingName;
         PlugUtil.showMsg("newBindingName name:" + newBindingName, project);
 
-        replaceStringUse(bindingName, newBindingName, runnable);
+        replaceStringUse(oldBindingName, newBindingName, runnable);
     }
 
     private void replaceStringUse(String beReplace, String newVal, Runnable runnable) {
@@ -580,7 +563,7 @@ public class AddPrefixToBatchFile extends AnAction {
         } else {
             Document document = ((UsageInfo2UsageAdapter) usage).getDocument();
             PlugUtil.showMsg("document.isWritable():" + document.isWritable(), project);
-            return !document.isWritable() ? false : ((UsageInfo2UsageAdapter) usage).processRangeMarkers((segment) -> {
+            return document.isWritable() && ((UsageInfo2UsageAdapter) usage).processRangeMarkers((segment) -> {
                 int textOffset = segment.getStartOffset();
                 int textEndOffset = segment.getEndOffset();
                 Ref stringToReplace = Ref.create();
@@ -866,7 +849,7 @@ public class AddPrefixToBatchFile extends AnAction {
                     return false;
                 }
 
-               // PlugUtil.showMsg("classInModule:" + isActivity(classInModule), project);
+                // PlugUtil.showMsg("classInModule:" + isActivity(classInModule), project);
 
                 return isFragment(classInModule)||isActivity(classInModule);
                 // return oldName.contains("Fragment") || oldName.contains("Activity");
@@ -915,9 +898,7 @@ public class AddPrefixToBatchFile extends AnAction {
         findJavaKotlin(startRoot, result, new ConditionPredicate() {
             @Override
             public boolean isMatch(PsiElement element) {
-                PlugUtil.showMsg("element:" + element + "@" + element.getClass().getName(), project);
-
-                return (isKtClass(element) || isJavaClass(element) || isKtFile(element)||isKtObject(element)) && filterCopy.isMatch(element);
+                return (isKtClass(element) || isJavaClass(element) || isKtObject(element)) && filterCopy.isMatch(element);
             }
         });
 
@@ -952,8 +933,8 @@ public class AddPrefixToBatchFile extends AnAction {
     }
 
     private boolean isActivity(String clsname) {
-      Class cls=findCls(clsname);
-      return cls.isAssignableFrom(findCls("android.app.Activity"));
+        Class cls=findCls(clsname);
+        return cls.isAssignableFrom(findCls("android.app.Activity"));
     }
 
     private boolean isFragment(String clsname) {
@@ -1055,11 +1036,18 @@ public class AddPrefixToBatchFile extends AnAction {
         if (oldName.equals("string")||oldName.equals("strings")||
                 oldName.equals("dimen")||oldName.equals("dimens")||
                 oldName.equals("color")||oldName.equals("colors")||
-                oldName.equals("style")||oldName.equals("styles")) {
+                oldName.equals("style")||oldName.equals("styles")||
+                oldName.equals("array")||oldName.equals("arrays")||
+                oldName.equals("attr")||oldName.equals("attrs")||
+                oldName.equals("theme")||oldName.equals("themes")) {
             return;
         }
 
-        if (oldName.startsWith(prefix)) {
+        if (oldName.equals("ic_file") || oldName.equals("ic_ad")) {
+            return;
+        }
+
+        if (!"".equals(prefix) && oldName.startsWith(prefix)) {
             return;
         }
 

@@ -14,7 +14,7 @@ public class PlugUtil {
 
     public static void showMsg(String msg, Project project, boolean showDialog) {
         NotificationHelper.INSTANCE.info(msg);
-
+        LOG.info(msg);
         if (showDialog) {
             CommonRefactoringUtil.showErrorMessage("提示", msg, null, project);
         }

@@ -273,16 +273,16 @@ class MyDeviceChooser(multipleSelection: Boolean,
                 DEVICE_NAME_COLUMN_INDEX -> return generateDeviceName(device)
                 SERIAL_COLUMN_INDEX -> return device.serialNumber
                 DEVICE_STATE_COLUMN_INDEX -> return getDeviceState(device)
-                COMPATIBILITY_COLUMN_INDEX -> return LaunchCompatibilityCheckerImpl.create(myFacet, null, null).validate(ConnectedAndroidDevice(device, null))
+                COMPATIBILITY_COLUMN_INDEX -> return LaunchCompatibilityCheckerImpl.create(myFacet, null, null)!!.validate(ConnectedAndroidDevice(device))
             }
             return null
         }
 
         private fun generateDeviceName(device: IDevice): String {
             return device.name
-                    .replace(device.serialNumber, "")
-                    .replace("[-_]".toRegex(), " ")
-                    .replace("[\\[\\]]".toRegex(), "")
+                .replace(device.serialNumber, "")
+                .replace("[-_]".toRegex(), " ")
+                .replace("[\\[\\]]".toRegex(), "")
         }
 
         override fun getColumnClass(columnIndex: Int): Class<*> {
@@ -302,17 +302,16 @@ class MyDeviceChooser(multipleSelection: Boolean,
             if (value !is LaunchCompatibility) {
                 return
             }
-            val compatibility = value
-            val compatible = compatibility.isCompatible
-            if (compatible == ThreeState.YES) {
+            val compatible = value.state
+            if (compatible == LaunchCompatibility.State.OK) {
                 append("Yes")
             } else {
-                if (compatible == ThreeState.NO) {
+                if (compatible == LaunchCompatibility.State.ERROR) {
                     append("No", SimpleTextAttributes.ERROR_ATTRIBUTES)
                 } else {
                     append("Maybe")
                 }
-                val reason = compatibility.reason
+                val reason = value.reason
                 if (reason != null) {
                     append(", ")
                     append(reason)
