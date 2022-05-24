@@ -320,7 +320,7 @@ public class AddPrefixToBatchFile extends AnAction {
         if (oldPrefix != null && oldPrefix.length() > 0) {
             String[] temp = oldPrefix.split("_");
             if (temp.length > 0) {
-                for (String part : arr) {
+                for (String part : temp) {
                     oldBindingName += upperFistChar(part);
                 }
             }
@@ -334,6 +334,7 @@ public class AddPrefixToBatchFile extends AnAction {
         }
 
         String prefix = upperFistChar(prefixarr[0]);
+        PlugUtil.showMsg("oldBindingName name:" + oldBindingName, project);
 
         if (oldBindingName.startsWith(prefix)) {
             runnable.run();
