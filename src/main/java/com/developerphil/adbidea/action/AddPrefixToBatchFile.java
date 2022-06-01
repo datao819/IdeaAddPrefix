@@ -1048,7 +1048,7 @@ public class AddPrefixToBatchFile extends AnAction {
             return;
         }
 
-        if (!"".equals(prefix) && oldName.startsWith(prefix)) {
+        if (!"".equals(prefix) && oldName.toLowerCase().startsWith(prefix.toLowerCase())) {
             return;
         }
 
